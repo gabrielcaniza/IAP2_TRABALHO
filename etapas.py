@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 from pathlib import Path
 import pandas as pd
@@ -140,7 +141,14 @@ def cli(etapa):
     parser.add_argument("--fase", default="desenvolvimento", help="Fase dos casos de teste")
     args = parser.parse_args()
 
-    config = configurar(args.config)
+    # Os caminhos do config (csv, saida, casos) são relativos à pasta do projeto,
+    # então o script funciona mesmo se for chamado de outra pasta.
+    pasta_projeto = Path(__file__).resolve().parent
+    caminho_config = Path(args.config).resolve()
+    if not caminho_config.exists():
+        caminho_config = pasta_projeto / args.config
+    os.chdir(pasta_projeto)
+    config = configurar(caminho_config)
     if etapa == 2:
         executar_etapa_2(config)
     elif etapa == 3:

@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Saídas locais de execução (os artefatos oficiais ficam em artefatos_v1/ e artefatos_v2/)
+artefatos_local/
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

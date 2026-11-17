@@ -81,50 +81,70 @@ CONFEDERACOES = {
     }
 }
 
+# Torneios continentais e as confederações que podem disputá-los.
+# A Copa América recebe convidados da CONCACAF, por isso aceita as duas.
 TORNEIOS_RESTRITOS = {
-    "UEFA Euro": "UEFA",
-    "UEFA Nations League": "UEFA",
-    "UEFA Euro qualification": "UEFA",
-    "African Cup of Nations": "CAF",
-    "African Cup of Nations qualification": "CAF",
-    "AFC Asian Cup": "AFC",
-    "AFC Asian Cup qualification": "AFC",
-    "Gold Cup": "CONCACAF"
+    "Copa América": ["CONMEBOL", "CONCACAF"],
+    "UEFA Euro": ["UEFA"],
+    "UEFA Nations League": ["UEFA"],
+    "UEFA Euro qualification": ["UEFA"],
+    "African Cup of Nations": ["CAF"],
+    "African Cup of Nations qualification": ["CAF"],
+    "AFC Asian Cup": ["AFC"],
+    "AFC Asian Cup qualification": ["AFC"],
+    "Gold Cup": ["CONCACAF"],
 }
 
+CONFEDERACAO_POR_SELECAO = {
+    selecao: conf for conf, selecoes in CONFEDERACOES.items() for selecao in selecoes
+}
+
+
 def obter_confederacao(selecao):
-    for conf, times in CONFEDERACOES.items():
-        if selecao in times:
-            return conf
-    return "Outra"
+    return CONFEDERACAO_POR_SELECAO.get(selecao, "Outra")
+
 
 def validar_torneio_geografico(mandante, visitante, torneio):
-    if torneio == "Copa América":
-        conf_m = obter_confederacao(mandante)
-        conf_v = obter_confederacao(visitante)
-        permitidas = {"CONMEBOL", "CONCACAF"}
-        incomp = []
-        if conf_m not in permitidas and conf_m != "Outra":
-            incomp.append(f"{mandante} ({conf_m})")
-        if conf_v not in permitidas and conf_v != "Outra":
-            incomp.append(f"{visitante} ({conf_v})")
-        if incomp:
-            return f"Torneio Incompatível: {' e '.join(incomp)} não disputa a Copa América (torneio restrito às Américas). Escolha FIFA World Cup ou Amistoso."
+    """Recusa confrontos impossíveis (ex.: Brasil x França na Eurocopa).
+
+    Seleções sem confederação cadastrada ("Outra") não são bloqueadas,
+    para não recusar partidas válidas de seleções menos conhecidas.
+    """
+    permitidas = TORNEIOS_RESTRITOS.get(torneio)
+    if not permitidas:
         return None
-
-    if torneio in TORNEIOS_RESTRITOS:
-        conf_exigida = TORNEIOS_RESTRITOS[torneio]
-        conf_m = obter_confederacao(mandante)
-        conf_v = obter_confederacao(visitante)
-        incomp = []
-        if conf_m != conf_exigida:
-            incomp.append(f"{mandante} ({conf_m})")
-        if conf_v != conf_exigida:
-            incomp.append(f"{visitante} ({conf_v})")
-        if incomp:
-            return f"Torneio Incompatível: {' e '.join(incomp)} não pertence à {conf_exigida} e não disputa o torneio {torneio}. Escolha FIFA World Cup ou Amistoso."
-
+    incompativeis = []
+    for selecao in (mandante, visitante):
+        conf = obter_confederacao(selecao)
+        if conf != "Outra" and conf not in permitidas:
+            incompativeis.append(f"{selecao} ({conf})")
+    if incompativeis:
+        return (f"{' e '.join(incompativeis)} não disputa {torneio}, "
+                f"torneio restrito à {' / '.join(permitidas)}. Escolha FIFA World Cup ou Friendly.")
     return None
+
+
+def montar_ranking():
+    """Ranking Elo atual (posição 1 = maior Elo) a partir do estado salvo na v2."""
+    ordenadas = sorted(estado_selecoes.items(), key=lambda kv: kv[1].get("elo", 0), reverse=True)
+    return {
+        nome: {
+            "elo": round(float(info.get("elo", 1500.0)), 1),
+            "posicao": posicao,
+            "forma": info.get("ultimos_5_jogos", []),
+            "confederacao": obter_confederacao(nome),
+        }
+        for posicao, (nome, info) in enumerate(ordenadas, start=1)
+    }
+
+
+ranking_selecoes = montar_ranking()
+
+metricas_path = BASE_DIR / "artefatos_v2" / "metricas_v2.json"
+metricas_v2 = {}
+if usando_v2 and metricas_path.exists():
+    with open(metricas_path, "r", encoding="utf-8") as f:
+        metricas_v2 = json.load(f)
 
 def obter_estatisticas_historico(mandante, visitante):
     if df_historico is None:
@@ -247,7 +267,15 @@ def get_opcoes():
     return jsonify({
         "selecoes": todas_selecoes,
         "torneios": todos_torneios,
-        "versao_modelo": "2.0.0" if usando_v2 else "1.0.0"
+        "versao_modelo": "2.0.0" if usando_v2 else "1.0.0",
+        "modelo": {
+            "nome": "RandomForest (200 árvores)" if usando_v2 else "Regressão Logística (baseline)",
+            "acuracia_teste": metricas_v2.get("acuracia_teste"),
+            "f1_macro_teste": metricas_v2.get("f1_macro_teste"),
+            "partidas": len(df_historico) if df_historico is not None else None,
+        },
+        "ranking": ranking_selecoes,
+        "torneios_restritos": TORNEIOS_RESTRITOS,
     })
 
 @app.route("/api/prever", methods=["POST"])
