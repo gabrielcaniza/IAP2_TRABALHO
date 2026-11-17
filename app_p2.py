@@ -7,6 +7,8 @@ import time
 import pandas as pd
 import joblib
 
+BASE_DIR = Path(__file__).resolve().parent
+
 class AppPreditorFutebol(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -33,15 +35,15 @@ class AppPreditorFutebol(tk.Tk):
         self._construir_interface()
 
     def _carregar_recursos(self):
-        with open("config.projeto.json", "r", encoding="utf-8") as f:
+        with open(BASE_DIR / "config.projeto.json", "r", encoding="utf-8") as f:
             self.config = json.load(f)
 
-        modelo_path = Path(self.config["saida"]) / "modelo_inicial.joblib"
+        modelo_path = BASE_DIR / self.config["saida"] / "modelo_inicial.joblib"
         if not modelo_path.exists():
             raise FileNotFoundError("Modelo nao encontrado em artefatos_v1/modelo_inicial.joblib")
         self.modelo = joblib.load(modelo_path)
 
-        csv_path = Path(self.config["csv"])
+        csv_path = BASE_DIR / self.config["csv"]
         if csv_path.exists():
             self.df_historico = pd.read_csv(csv_path)
             todas_selecoes = sorted(list(set(self.df_historico["mandante"].dropna().unique().tolist() + 

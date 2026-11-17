@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SofaPredict AI — Previsão de Futebol Internacional</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body class="font-sans text-slate-100 antialiased lg:h-screen lg:overflow-hidden flex flex-col">
+
+  <!-- Cabeçalho -->
+  <header class="shrink-0 border-b border-white/5 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-emerald-400 flex items-center justify-center font-extrabold text-slate-950 text-sm shadow-lg shadow-sky-500/20">IA</div>
+        <div class="min-w-0">
+          <h1 class="text-sm sm:text-base font-extrabold tracking-tight leading-none">SofaPredict <span class="text-sky-400">AI</span></h1>
+          <p class="text-[11px] text-slate-400 leading-tight mt-0.5 truncate">Previsão de partidas internacionais de futebol</p>
+        </div>
+      </div>
+      <div id="info-modelo" class="hidden md:flex items-center gap-2 text-xs">
+        <span class="chip"><span class="w-2 h-2 rounded-full bg-emerald-400"></span><span id="info-modelo-nome">Carregando modelo…</span></span>
+        <span class="chip font-mono" id="info-modelo-f1" title="F1-macro no conjunto de teste"></span>
+        <span class="chip font-mono" id="info-modelo-acc" title="Acurácia no conjunto de teste"></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 min-h-0 w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+    <!-- Coluna esquerda: montagem do confronto -->
+    <section class="lg:col-span-5 min-h-0 flex flex-col gap-4 lg:overflow-y-auto custom-scroll lg:pr-1" aria-label="Montar confronto">
+      <form id="form-confronto" class="card p-4 sm:p-5 space-y-5" autocomplete="off" novalidate>
+        <div class="flex items-center justify-between">
+          <h2 class="titulo-secao">Monte o confronto</h2>
+          <span class="text-[11px] text-slate-500">Digite para buscar</span>
+        </div>
+
+        <!-- Seleções -->
+        <div class="grid grid-cols-[1fr_auto_1fr] items-start gap-2 sm:gap-3">
+          <div class="time-bloco" data-lado="mandante">
+            <div class="bandeira-wrap">
+              <img id="flag-mandante" class="bandeira" alt="">
+              <div id="sigla-mandante" class="bandeira-sigla hidden"></div>
+              <span class="tag-lado bg-emerald-400">Mandante</span>
+            </div>
+            <label for="mandante" class="sr-only">Seleção mandante</label>
+            <input id="mandante" name="mandante" list="lista-selecoes" class="campo text-center font-semibold" placeholder="Seleção mandante" required>
+            <div id="meta-mandante" class="meta-time"></div>
+          </div>
+
+          <div class="flex flex-col items-center pt-6 gap-2">
+            <span class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-extrabold text-slate-400">VS</span>
+            <button type="button" id="btn-inverter" class="btn-icone" title="Inverter mandante e visitante" aria-label="Inverter mandante e visitante">
+              <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h13l-4-4M17 17H4l4 4"/></svg>
+            </button>
+          </div>
+
+          <div class="time-bloco" data-lado="visitante">
+            <div class="bandeira-wrap">
+              <img id="flag-visitante" class="bandeira" alt="">
+              <div id="sigla-visitante" class="bandeira-sigla hidden"></div>
+              <span class="tag-lado bg-sky-400">Visitante</span>
+            </div>
+            <label for="visitante" class="sr-only">Seleção visitante</label>
+            <input id="visitante" name="visitante" list="lista-selecoes" class="campo text-center font-semibold" placeholder="Seleção visitante" required>
+            <div id="meta-visitante" class="meta-time"></div>
+          </div>
+        </div>
+        <datalist id="lista-selecoes"></datalist>
+
+        <!-- Mando de campo -->
+        <fieldset>
+          <legend class="rotulo">Mando de campo</legend>
+          <div class="segmentado" role="radiogroup">
+            <label>
+              <input type="radio" name="campo_neutro" value="Nao" checked>
+              <span>Casa do mandante <small>+70 Elo</small></span>
+            </label>
+            <label>
+              <input type="radio" name="campo_neutro" value="Sim">
+              <span>Campo neutro <small>sem bônus</small></span>
+            </label>
+          </div>
+        </fieldset>
+
+        <!-- Torneio -->
+        <div>
+          <label for="torneio" class="rotulo">Competição</label>
+          <input id="torneio" name="torneio" list="lista-torneios" class="campo" placeholder="Ex.: FIFA World Cup" required>
+          <datalist id="lista-torneios"></datalist>
+          <div id="sugestoes-torneio" class="flex flex-wrap gap-1.5 mt-2"></div>
+        </div>
+
+        <!-- Alerta de validação -->
+        <div id="alerta" class="hidden rounded-xl border border-rose-500/40 bg-rose-950/40 p-3 text-sm text-rose-100" role="alert" aria-live="polite">
+          <p class="font-bold text-rose-300 text-xs uppercase tracking-wider mb-1">Revise o confronto</p>
+          <p id="alerta-msg" class="text-[13px] leading-snug"></p>
+          <div id="alerta-acoes" class="flex flex-wrap gap-1.5 mt-2"></div>
+        </div>
+
+        <button id="btn-prever" type="submit" class="btn-principal">
+          <span id="btn-prever-texto">Analisar confronto</span>
+          <kbd class="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-950/20">Enter</kbd>
+        </button>
+      </form>
+
+      <div class="card p-4 space-y-3">
+        <h2 class="titulo-secao">Clássicos rápidos</h2>
+        <div id="classicos" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <div class="card p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="titulo-secao">Análises recentes</h2>
+          <button type="button" id="btn-limpar-historico" class="text-[11px] text-slate-500 hover:text-slate-300 hidden">Limpar</button>
+        </div>
+        <ul id="historico" class="space-y-1.5 text-sm"></ul>
+      </div>
+    </section>
+
+    <!-- Coluna direita: resultado -->
+    <section class="lg:col-span-7 min-h-0 flex flex-col" aria-label="Resultado da análise">
+      <div class="card flex-1 min-h-[420px] flex flex-col overflow-hidden">
+        <div class="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-white/5 shrink-0">
+          <div class="flex items-center gap-2">
+            <span id="status-ponto" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+            <h2 id="status-titulo" class="titulo-secao">Diagnóstico da IA</h2>
+          </div>
+          <span id="status-detalhe" class="text-[11px] font-mono text-slate-500">Aguardando confronto</span>
+        </div>
+        <div id="resultado" class="flex-1 overflow-y-auto custom-scroll p-4 sm:p-5 space-y-4" aria-live="polite">
+          <div class="h-full min-h-[340px] flex flex-col items-center justify-center text-center gap-3 px-6">
+            <div class="w-14 h-14 rounded-2xl bg-slate-900 border border-white/5 flex items-center justify-center text-sky-400">
+              <svg viewBox="0 0 24 24" class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7l3.5 2.5-1.3 4h-4.4l-1.3-4z"/><path d="M12 3v4M21 10.5l-5.5-1M18 19l-3.8-5.5M6 19l3.8-5.5M3 10.5l5.5-1"/></svg>
+            </div>
+            <h3 class="font-bold text-slate-200">Pronto para analisar</h3>
+            <p class="text-sm text-slate-400 max-w-sm leading-relaxed">Escolha as seleções, o mando de campo e a competição, e clique em <strong class="text-sky-400">Analisar confronto</strong>. Você também pode começar por um dos clássicos.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="shrink-0 text-center text-[11px] text-slate-500 py-2 px-4">
+    Projeto P2 — Inteligência Artificial e Machine Learning · Maicon Dutra, Gabriel Caniza e Gabriel Vidal
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

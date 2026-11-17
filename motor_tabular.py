@@ -29,8 +29,11 @@ def assinatura(config):
     h = hashlib.sha256(payload.encode('utf-8'))
     csv_path = Path(config['csv'])
     if csv_path.exists():
-        h.update(str(csv_path.stat().st_mtime).encode('utf-8'))
-        h.update(str(csv_path.stat().st_size).encode('utf-8'))
+        # Usa o conteúdo do CSV (e não a data de modificação), para que a
+        # assinatura seja a mesma após um git clone. As quebras de linha são
+        # normalizadas porque o Git pode converter CRLF (Windows) em LF.
+        conteudo = csv_path.read_bytes().replace(b'\r\n', b'\n')
+        h.update(hashlib.sha256(conteudo).digest())
     return h.hexdigest()[:16]
 
 def checar_config(config):
